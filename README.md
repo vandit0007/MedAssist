@@ -1,70 +1,159 @@
-# Getting Started with Create React App
+MedAssist – Medical Symptom Triage Chatbot
+MedAssist is a web application that helps users describe their symptoms in natural language and recommends a suitable hospital department using an AI-powered chatbot.
+The project uses a React frontend and a Flask backend with basic NLP (TF‑IDF + cosine similarity).
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Features
+Chat-style interface to enter symptoms in plain English.
 
-## Available Scripts
+Extracts key symptoms from user input.
 
-In the project directory, you can run:
+Maps symptoms to hospital departments (e.g., Cardiology).
 
-### `npm start`
+Returns:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Recommended department
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+Confidence score
 
-### `npm test`
+Follow-up questions for better triage
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+CORS-enabled API for smooth React ↔ Flask communication.
 
-### `npm run build`
+Tech Stack
+Frontend: React, JavaScript, CSS
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Backend: Flask (Python)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+ML / NLP:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+scikit-learn (TfidfVectorizer, cosine_similarity)
 
-### `npm run eject`
+numpy, pandas
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Others: flask-cors for CORS handling
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Project Structure
+Adjust this if your folders are named differently.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+text
+MedAssist/
+├── backend/
+│   ├── app.py
+│   ├── requirements.txt
+│   └── (other Python modules)
+├── frontend/
+│   ├── src/
+│   │   ├── App.js
+│   │   ├── index.js
+│   │   ├── App.css
+│   │   └── index.css
+│   ├── public/
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   ├── robots.txt
+│   │   ├── logo192.jpg
+│   │   └── logo512.jpg
+│   ├── package.json
+│   └── README.md (this file)
+└── MedAssist-1.ipynb (optional notebook)
+If you are not using separate backend/ and frontend/ folders, update this section to match your actual layout.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Backend Setup (Flask)
+Create and activate a virtual environment (recommended):
 
-## Learn More
+bash
+python -m venv venv
+venv\Scripts\activate      # Windows
+# source venv/bin/activate # macOS / Linux
+Install dependencies:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+bash
+pip install -r requirements.txt
+Example requirements.txt (edit if needed):
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+text
+Flask
+flask-cors
+numpy
+pandas
+scikit-learn
+Run the Flask server:
 
-### Code Splitting
+bash
+python app.py
+By default the API will be available at:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+http://127.0.0.1:8000/api/chat
 
-### Analyzing the Bundle Size
+Frontend Setup (React)
+Install Node.js (if not already installed).
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Inside the React project folder (where package.json is):
 
-### Making a Progressive Web App
+bash
+npm install
+npm start
+The React app will usually run at:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+http://localhost:3000
 
-### Advanced Configuration
+Ensure your Axios/fetch calls in App.js point to the Flask URL, for example:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+js
+axios.post("http://127.0.0.1:8000/api/chat", { symptoms: userInput })
+API Endpoint
+POST /api/chat
+Request body (JSON):
 
-### Deployment
+json
+{
+  "symptoms": "I have chest pain and shortness of breath"
+}
+Successful response example:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+json
+{
+  "department": "cardiology",
+  "confidence": 0.87,
+  "follow_up": [
+    "Do you experience chest pain during physical activity?",
+    "Have you noticed any irregular heartbeat?",
+    "Do you have any family history of heart disease?"
+  ],
+  "message": "Recommended department: CARDIOLOGY"
+}
+If no good match is found, the API returns a message suggesting a general practitioner.
 
-### `npm run build` fails to minify
+How It Works (Logic Overview)
+A small medical knowledge base defines departments and related symptoms.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+TF‑IDF vectorization converts symptom text into numeric vectors.
+
+Cosine similarity is used to compare user-described symptoms with known symptoms.
+
+Average similarity per department is computed to select the best match.
+
+A confidence threshold decides whether to recommend a department or fall back to a generic suggestion.
+
+Running Both Frontend and Backend
+Start Flask backend:
+
+bash
+python app.py
+Start React frontend:
+
+bash
+npm start
+Open the React app in your browser and interact with the chatbot.
+The frontend sends POST requests to http://127.0.0.1:8000/api/chat.
+
+Future Improvements
+Expand the medical knowledge base with more departments and symptoms.
+
+Add multilingual support for symptom descriptions.
+
+Integrate a real medical ontology or external API.
+
+Add authentication for doctors/admins to edit the knowledge base.
+
+Deploy both frontend and backend to cloud platforms.
