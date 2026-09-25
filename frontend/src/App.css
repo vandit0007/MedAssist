@@ -30,7 +30,7 @@ body {
 .header-top {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .title-area {
@@ -41,7 +41,14 @@ body {
   gap: 12px;
 }
 
-.title-area h1 {
+.logo-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.logo-title h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
@@ -56,6 +63,46 @@ body {
   font-size: 12px;
   font-weight: 600;
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Language Selector */
+.language-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 4px 8px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.lang-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.lang-btn {
+  background: transparent;
+  border: none;
+  color: #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.lang-btn.active {
+  background: #ffffff;
+  color: #0369a1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .subtitle {
@@ -132,7 +179,7 @@ body {
   border-radius: 16px;
   box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.2);
   overflow-y: auto;
-  max-height: calc(100vh - 280px);
+  max-height: calc(100vh - 300px);
   min-height: 400px;
   display: flex;
   flex-direction: column;
@@ -153,7 +200,7 @@ body {
 }
 
 .chat-message {
-  max-width: 82%;
+  max-width: 84%;
   padding: 14px 18px;
   border-radius: 14px;
   font-size: 14px;
@@ -180,11 +227,37 @@ body {
   color: #991b1b;
 }
 
-.message-header {
+/* Header Row in Message (Name + Speaker Button) */
+.message-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sender-name {
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  margin-bottom: 6px;
   opacity: 0.85;
+}
+
+.btn-speak {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-speak:hover {
+  background: #0284c7;
+  color: #ffffff;
+  transform: scale(1.05);
 }
 
 .message-body {
@@ -373,11 +446,57 @@ body {
   margin-left: 6px;
 }
 
-/* Chat Input Form */
+/* Chat Input Form with Microphone Button */
 .chat-input-form {
   display: flex;
   gap: 10px;
   margin-top: 14px;
+  align-items: center;
+}
+
+/* Microphone Button */
+.mic-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #38bdf8;
+  background: #ffffff;
+  color: #0369a1;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  flex-shrink: 0;
+}
+
+.mic-button:hover {
+  background: #f0f9ff;
+  transform: scale(1.06);
+}
+
+/* Pulsing red animation when recording */
+.mic-button.listening-pulse {
+  background: #fee2e2;
+  border-color: #ef4444;
+  animation: mic-pulse 1.2s infinite ease-in-out;
+}
+
+@keyframes mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    transform: scale(1.1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    transform: scale(1);
+  }
 }
 
 .chat-input-form input {
@@ -397,8 +516,8 @@ body {
   box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
 }
 
-.chat-input-form button {
-  padding: 14px 24px;
+.btn-send {
+  padding: 14px 22px;
   border-radius: 12px;
   border: none;
   background: linear-gradient(135deg, #0284c7, #2563eb);
@@ -407,14 +526,15 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
 }
 
-.chat-input-form button:hover:not(:disabled) {
+.btn-send:hover:not(:disabled) {
   opacity: 0.95;
   transform: translateY(-1px);
 }
 
-.chat-input-form button:disabled {
+.btn-send:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

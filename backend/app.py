@@ -6,6 +6,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
 import os
+import urllib.request
+import urllib.parse
+import json
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -30,6 +33,26 @@ EMERGENCY_RED_FLAGS = [
     r"anaphylaxis|throat closing"
 ]
 
+def is_hindi(text):
+    """Detects if text contains Devanagari script (Hindi characters)."""
+    return bool(re.search(r'[\u0900-\u097F]', str(text)))
+
+def translate_text(text, source_lang='auto', target_lang='en'):
+    """Translates text using Google Translate free endpoint with graceful fallback."""
+    if not text or source_lang == target_lang:
+        return text
+    try:
+        q = urllib.parse.quote(str(text))
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={source_lang}&tl={target_lang}&dt=t&q={q}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=4) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            translated = ''.join([item[0] for item in res_data[0] if item and item[0]])
+            return translated if translated else text
+    except Exception as e:
+        print(f"Translation notice ({source_lang}->{target_lang}):", e)
+        return text
+
 class MedicalChatbot:
     def __init__(self, data_file=DATA_PATH):
         self.data_file = data_file
@@ -47,20 +70,16 @@ class MedicalChatbot:
         self.df = pd.read_csv(self.data_file)
         self.df.fillna('', inplace=True)
 
-        # Build corpus combining symptoms and condition descriptions
         self.corpus = []
         self.symptom_vocab = set()
 
         for _, row in self.df.iterrows():
-            # Parse individual symptoms for vocabulary
             raw_symptoms = [s.strip().lower() for s in row['symptoms'].split(',') if s.strip()]
             self.symptom_vocab.update(raw_symptoms)
 
-            # Combined representation for vectorizer
             combined_text = f"{row['condition']} {row['symptoms']} {row['description']}".lower()
             self.corpus.append(combined_text)
 
-        # Fit TF-IDF on corpus
         if self.corpus:
             self.tfidf_matrix = self.vectorizer.fit_transform(self.corpus)
         else:
@@ -79,12 +98,10 @@ class MedicalChatbot:
         matched_symptoms = []
         user_input_lower = user_input.lower()
 
-        # Direct vocabulary matching
         for symptom in self.symptom_vocab:
             if symptom in user_input_lower:
                 matched_symptoms.append(symptom)
 
-        # Common phrase matching regex patterns
         patterns = [
             r"i have (.*?)(?:\.|$|,)",
             r"experiencing (.*?)(?:\.|$|,)",
@@ -102,7 +119,7 @@ class MedicalChatbot:
 
         return list(set(matched_symptoms))
 
-    def process_message(self, user_input):
+    def process_message(self, user_input, preferred_lang='auto'):
         if not user_input or not isinstance(user_input, str):
             return {
                 "department": None,
@@ -114,9 +131,18 @@ class MedicalChatbot:
                 "message": "Please enter a description of your symptoms."
             }
 
+        input_is_hindi = is_hindi(user_input)
+        should_respond_hindi = (preferred_lang == 'hi') or input_is_hindi
+
+        # If input is in Hindi, translate to English for semantic matching
+        if input_is_hindi:
+            search_query = translate_text(user_input, source_lang='hi', target_lang='en')
+        else:
+            search_query = user_input
+
         # 1. Emergency Red Flag Check
-        if self._check_emergency(user_input):
-            return {
+        if self._check_emergency(search_query):
+            response = {
                 "department": "EMERGENCY MEDICINE (ER)",
                 "condition": "Acute Critical Condition Warning",
                 "confidence": 1.0,
@@ -133,20 +159,22 @@ class MedicalChatbot:
                 "severity": "Emergency",
                 "message": "⚠️ CRITICAL ALERT: Your symptoms may indicate a life-threatening medical emergency. Please call emergency services (911/112) or go to the nearest Emergency Room immediately."
             }
+            if should_respond_hindi:
+                return self._translate_response(response, target_lang='hi')
+            return response
 
         # 2. Extract Symptoms
-        symptoms_found = self._extract_symptoms(user_input)
+        symptoms_found = self._extract_symptoms(search_query)
 
         # 3. Vector Search against Dataset
-        query_vector = self.vectorizer.transform([user_input.lower()])
+        query_vector = self.vectorizer.transform([search_query.lower()])
         similarities = cosine_similarity(query_vector, self.tfidf_matrix)[0]
 
         best_idx = int(np.argmax(similarities))
         max_similarity = float(similarities[best_idx])
 
-        # Confidence threshold
         if max_similarity < 0.08 and not symptoms_found:
-            return {
+            fallback = {
                 "department": "GENERAL MEDICINE",
                 "condition": None,
                 "confidence": round(max_similarity, 2),
@@ -163,6 +191,9 @@ class MedicalChatbot:
                 "severity": "Mild",
                 "message": "Could not identify a specific specialist match based on your description. We recommend consulting a General Physician for an initial evaluation."
             }
+            if should_respond_hindi:
+                return self._translate_response(fallback, target_lang='hi')
+            return fallback
 
         matched_row = self.df.iloc[best_idx]
         department = str(matched_row['department']).strip()
@@ -170,7 +201,6 @@ class MedicalChatbot:
         description = str(matched_row['description']).strip()
         severity = str(matched_row['severity_level']).strip()
 
-        # Parse follow-ups and precautions
         raw_follow_ups = str(matched_row['follow_up_questions']).split(';')
         follow_ups = [q.strip() for q in raw_follow_ups if q.strip()]
 
@@ -179,14 +209,13 @@ class MedicalChatbot:
 
         confidence_score = min(round(max(max_similarity, 0.45 if symptoms_found else 0.25) * 1.2, 2), 0.98)
 
-        # Formulate comprehensive response message
         message = (
             f"Recommended Department: {department.upper()}\n"
             f"Potential Match: {condition}\n"
             f"Overview: {description}"
         )
 
-        return {
+        res = {
             "department": department,
             "condition": condition,
             "confidence": confidence_score,
@@ -197,6 +226,27 @@ class MedicalChatbot:
             "message": message
         }
 
+        if should_respond_hindi:
+            return self._translate_response(res, target_lang='hi')
+        return res
+
+    def _translate_response(self, response_dict, target_lang='hi'):
+        """Translates message, follow-up questions, and precautions into target language."""
+        translated = dict(response_dict)
+        translated['message'] = translate_text(response_dict['message'], source_lang='en', target_lang=target_lang)
+        translated['description'] = translate_text(response_dict.get('description', ''), source_lang='en', target_lang=target_lang)
+        
+        translated['follow_up'] = [
+            translate_text(q, source_lang='en', target_lang=target_lang)
+            for q in response_dict.get('follow_up', [])
+        ]
+        translated['precautions'] = [
+            translate_text(p, source_lang='en', target_lang=target_lang)
+            for p in response_dict.get('precautions', [])
+        ]
+        translated['language'] = target_lang
+        return translated
+
 chatbot = MedicalChatbot()
 
 @app.route('/api/chat', methods=['POST'])
@@ -204,16 +254,16 @@ def chat():
     try:
         data = request.json or {}
         user_input = data.get('symptoms', '')
+        language = data.get('language', 'auto')
         if not isinstance(user_input, str):
             return jsonify({"error": "Symptoms must be a string"}), 400
-        response = chatbot.process_message(user_input)
+        response = chatbot.process_message(user_input, preferred_lang=language)
         return jsonify(response)
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
 @app.route('/api/departments', methods=['GET'])
 def get_departments():
-    """Returns available medical departments in the dataset."""
     if chatbot.df is not None:
         departments = sorted(chatbot.df['department'].unique().tolist())
         return jsonify({"departments": departments})
@@ -221,7 +271,6 @@ def get_departments():
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """Returns statistics about the loaded dataset."""
     if chatbot.df is not None:
         return jsonify({
             "total_conditions": len(chatbot.df),
